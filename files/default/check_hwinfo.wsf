@@ -1,0 +1,234 @@
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+' "check_hwinfo.wsf"
+'
+' This script was initially developed by Anstat Pty Ltd for internal use,
+' and has kindly been made available to the Open Source community for
+' redistribution and further development under the terms of the
+' GNU General Public License: http://www.gnu.org/licenses/gpl.html
+' 
+' This script is supplied 'as-is', in the hope that it will be useful, but
+' neither Anstat Pty Ltd nor the authors make any warranties or guarantees
+' as to its correct operation, including its intended function.
+' 
+' Or in other words:
+'         Test it yourself, and make sure it works for YOU.
+' 
+' Authors: George Hansper, Richard Balaganeshan
+'                                   e-mail:  Name.Surname@anstat.com.au
+'
+<job>
+<runtime>
+  <description>
+Show one-line summary of Hardware information, displayed as:
+  [Motherboard:Model:Serial][n:CPU:MHz:L2Cache:FSB][Memory:ECC:Module/Module/...][disk_size:Raid:...]
+Example:
+  [Dell:PowerEdge 2850:ABCDE1S][2:Xeon:3600 MHz:2048 KB:800 MHz][4096 M:Multi-bit ECC:2048M/2048M/0/0/0/0][sda=683.1 G:MegaRAID,LD 0 RAID5  699G,521X][Red Hat Enterprise Linux ES release 4 (Nahant Update 3)]
+
+
+NRPE Usage:
+  command[check_hwinfo]=c:\winnt\system32\cscript.exe //NoLogo //T:10 c:\nrpe_nt\check_hwinfo.wsf
+  command[check_hwinfo_csv]=c:\winnt\system32\cscript.exe //NoLogo //T:10 c:\nrpe_nt\check_hwinfo.wsf /sep:","
+
+</description>
+  <named
+    name="h"
+    helpstring="This Help"
+    type="simple"
+    required="false" 
+  />
+  <named
+    name="sep"
+    helpstring="Separation character(s) - use csv for quoted comma-separated output"
+    type="simple"
+    required="false" 
+  />
+  <example>
+Example: check_hwinfo.wsf /sep:","
+  </example>
+</runtime>
+<script language="VBScript">
+
+' Output format:
+' [Motherboard:Model:Serial][n:CPU:MHz:L2Cache:FSB][Memory:ECC:Module/Module/...][disk_size/...:Raid/...]
+' [Dell:PowerEdge 2850:ABCDE1S][2:Xeon:3600 MHz:2048 KB:800 MHz][4096 M:Multi-bit ECC:2048M/2048M/0/0/0/0][sda=683.1 G:MegaRAID,LD 0 RAID5  699G,521X][Red Hat Enterprise Linux ES release 4 (Nahant Update 3)]
+
+
+
+Dim strComputer,strSep
+Const strCSV = ""","""
+
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+' Help
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+If Wscript.Arguments.Named.Exists("h")  Then
+      Wscript.Echo "Plugin help screen:"
+      Wscript.Arguments.ShowUsage()
+      Wscript.Quit(intUnknown)
+End If
+
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+' Sep
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+If Wscript.Arguments.Named.Exists("sep")  Then
+      strSep = Wscript.Arguments.Named("sep")
+      If ( strSep = "csv" ) Then
+          strSep = strCSV
+      End If
+Else
+      strSep = ":"
+End If
+
+
+strComputer = "."
+
+Function GetWMIServices()
+        Set GetWMIServices = GetObject("winmgmts:" _
+            & "{impersonationLevel=impersonate}!\\" & strComputer & "\root\cimv2")
+End Function
+
+Set objWMIService = GetWMIServices()
+
+On Error Resume Next
+
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+' Model and Serial Number (aka "service tag")
+Dim strModel(2)
+Dim strMessage
+
+Set colItems = objWMIService.ExecQuery("Select * from Win32_ComputerSystemProduct",,48)
+For Each objItem in colItems
+    ' eg Dell
+    strModel(0) = Trim(objItem.Vendor)
+    ' eg Poweredge 800
+    strModel(1) = Trim(objItem.Name)
+    ' Service Tag
+    strModel(2) = Trim(objItem.IdentifyingNumber)
+Next
+
+' CPU Speed   [nCpus:Model:MHz:L2 cache:FSB]
+Dim strCPU(4)
+Dim ndx
+Dim strCpuSockets(0)
+Dim nCpuSockets
+Dim nCpuSocketFound
+Dim nCpus
+
+nCpuSockets = 0
+nCpus = 0
+Set colItems = objWMIService.ExecQuery("Select * from Win32_Processor")
+For Each objItem in colItems
+    nCpuSocketFound = 0
+    For ndx = 0 to nCpuSockets
+        if ( strCpuSockets(ndx) = objItem.SocketDesignation ) Then
+            nCpuSocketFound = 1
+            Exit For
+        End If
+    Next
+    If ( nCpuSocketFound = 0 ) Then
+       nCpuSockets = nCpuSockets + 1
+       Redim strCpuSockets(nCpuSockets-1)
+       strCpuSockets(nCpuSockets-1) = objItem.SocketDesignation
+       if ( NOT objItem.DeviceID = "" ) Then
+           nCpus = nCpus+1
+           strCPU(1) = Trim(objItem.Name)
+           strCPU(2) = objItem.CurrentClockSpeed & " MHz"
+           strCPU(3) = objItem.L2CacheSize & " KB"
+           strCPU(4) = objItem.ExtClock & " MHz"
+       End If
+    End If
+Next
+
+strCPU(0) = nCpus
+
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+' Memory  [Memory:ECC:Modules/...]
+Dim strMem(2)
+Dim strMemModules()
+Dim nMemModules
+Dim nTotalBytes
+nMemModules = 0
+nMemorySlots = 0
+nTotalBytes = 0
+Set colItems = objWMIService.ExecQuery("Select * from Win32_PhysicalMemoryArray")
+For Each objItem in colItems
+        if( objItem.MemoryErrorCorrection =7 ) Then
+            strMem(1) = "CRC ECC"
+        ElseIf ( objItem.MemoryErrorCorrection = 6 ) Then
+            strMem(1) = "Multi-bit ECC"
+        ElseIf ( objItem.MemoryErrorCorrection = 5 ) Then
+            strMem(1) = "Single-bit ECC"
+        ElseIf ( objItem.MemoryErrorCorrection = 4 ) Then
+            strMem(1) = "Parity"
+        ElseIf ( objItem.MemoryErrorCorrection = 3 ) Then
+            strMem(1) = "Non-ECC"
+        Else
+            strMem(1) = "Non-ECC (unknown)"
+        End If
+        nMemorySlots = objItem.MemoryDevices
+Next
+
+ReDim strMemModules(nMemorySlots-1)
+for ndx = 0 to nMemorySlots
+    strMemModules(ndx) = 0
+Next
+
+Set colItems = objWMIService.ExecQuery("Select * from Win32_PhysicalMemory")
+For Each objItem in colItems
+    nTotalBytes = nTotalBytes + objItem.Capacity
+    strMemModules(nMemModules) = ( objItem.Capacity  / 1024 / 1024 ) & "M"
+    nMemModules = nMemModules + 1
+    'Wscript.Echo ( objItem.Capacity  / 1024 / 1024 ) & "M"
+Next
+strMem(2) = Join(strMemModules,"/")
+
+strMem(0) = FormatNumber(( nTotalBytes  / 1024 / 1024 ),0,TristateFalse,TristateFalse,TristateFalse) & "M"
+
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+' Disk and RAID status [disk_size/...:Raid]
+Dim strDisk()
+Dim nDisks
+Dim strRaid()
+Dim strDiskInfo(1)
+nDisks = 0
+strRaid = ""
+Set colItems = objWMIService.ExecQuery("Select * from Win32_DiskDrive")
+For Each objItem in colItems
+  nDisks = nDisks + 1
+  ReDim Preserve strDisk(nDisks-1)
+  ReDim Preserve strRaid(nDisks-1)
+  strDisk(nDisks-1) = FormatNumber((objItem.Size / 1024 / 1024 /1024) ,0,TristateFalse,TristateFalse,TristateFalse) & " G"
+  'if ( InStr(Lcase(objItem.Model), "raid" ) > 0 ) Then
+    strRaid(nDisks-1) = Trim(objItem.Model) & ""
+  'Else
+    strDisk(nDisks-1) = strDisk(nDisks-1)
+  ' strRaid(nDisks-1) = "No Raid"
+  'End If
+Next
+' strDisk(nDisks) = strRaid
+strDiskInfo(0) = Join(strDisk," / ")
+strDiskInfo(1) = Join(strRaid," / ")
+
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+Dim strOSInfo
+Set colItems = objWMIService.ExecQuery("Select * from Win32_OperatingSystem")
+For Each objItem in colItems
+  strOSInfo = objItem.Caption
+Next
+
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+if ( strSep = ":" ) Then
+  strMessage = "[" & Join(strModel, strSep) & "][" & Join(strCPU,strSep) & "][" & Join(strMem,strSep) & "][" & Join(strDiskInfo,strSep) & "][" & strOSInfo & "]"
+Else
+  strMessage = Join(strModel, strSep) & strSep & Join(strCPU,strSep) & strSep & Join(strMem,strSep) & strSep & Join(strDiskInfo,strSep) & strSep & strOSInfo
+  If ( strSep = strCSV ) Then
+    strMessage = """" & strMessage & """"
+  End If
+End If
+
+
+Wscript.Echo strMessage
+WScript.Quit(0)
+
+</script>
+</job>
+
