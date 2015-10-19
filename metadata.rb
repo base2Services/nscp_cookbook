@@ -4,7 +4,7 @@ maintainer_email 'you@example.com'
 license          'all_rights'
 description      'Installs/Configures nscp'
 long_description 'Installs/Configures nscp'
-version          '0.1.1'
+version          '0.3.0'
 
 depends "chocolatey"
 supports "windows"
