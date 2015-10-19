@@ -12,7 +12,7 @@ default["nscp"]["application_name"] = "NSClient++ (x64)"
 default["nscp"]["arch_extension"] = "x64"
 default["nscp"]["version"] =  "0.4.3.143"
 default["nscp"]["repo_path"] = "https://github.com/mickem/nscp/releases/download/#{node["nscp"]["version"]}"
-default["nscp"]["app_path"] = "#{node["nscp"]["repo_path"]}/#{node["nscp"]["version"]}-#{node["nscp"]["arch_extension"]}"
+default["nscp"]["app_path"] = "#{node["nscp"]["repo_path"]}/#{node["nscp"]["version"]}-#{node["nscp"]["arch_extension"]}.msi"
 
 default["nscp"]["allowed_hosts"] = ["127.0.0.1"]
 
