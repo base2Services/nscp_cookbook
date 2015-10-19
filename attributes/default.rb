@@ -1,10 +1,18 @@
-default["nscp"]["use_chocolatey"] = true
+#upstream chocolatey package is broken
+default["nscp"]["use_chocolatey"] = false
+
 default["nscp"]["app_path"] = "C:\\Program Files\\NSClient++"
 default["nscp"]["script_path"] = "C:\\Program Files\\NSClient++\\scripts"
 
+#https://github.com/mickem/nscp/releases/download/0.4.3.143/NSCP-0.4.3.143-x64.msi
+#https://github.com/mickem/nscp/releases/download/0.4.3.143/NSCP-0.4.3.143-Win32.msi
+#only tested/working for 64 bit so far
+
 default["nscp"]["application_name"] = "NSClient++ (x64)"
-default["nscp"]["version"] =  "0.4.1.102"
-default["nscp"]["repo_path"] = "http://files.nsclient.org/legacy"
+default["nscp"]["arch_extension"] = "x64"
+default["nscp"]["version"] =  "0.4.3.143"
+default["nscp"]["repo_path"] = "https://github.com/mickem/nscp/releases/download/#{node["nscp"]["version"]}"
+default["nscp"]["app_path"] = "#{node["nscp"]["repo_path"]}/#{node["nscp"]["version"]}-#{node["nscp"]["arch_extension"]}"
 
 default["nscp"]["allowed_hosts"] = ["127.0.0.1"]
 
