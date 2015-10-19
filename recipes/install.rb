@@ -12,7 +12,7 @@ if node["nscp"]["use_chocolatey"]
   chocolatey "nscp"
 else
   windows_package node["nscp"]["application_name"] do
-    source "#{app_path}"
+    source "#{node["nscp"]["app_path"]}"
     action :install
   end
 end
