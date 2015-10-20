@@ -3,6 +3,7 @@ default["nscp"]["use_chocolatey"] = false
 
 default["nscp"]["install_path"] = "C:\\Program Files\\NSClient++"
 default["nscp"]["script_path"] = "#{node["nscp"]["install_path"]}\\scripts"
+default["nscp"]["ini_path"] = "#{node['nscp']['install_path']}\\nsclient.ini"
 
 #https://github.com/mickem/nscp/releases/download/0.4.3.143/NSCP-0.4.3.143-x64.msi
 #https://github.com/mickem/nscp/releases/download/0.4.3.143/NSCP-0.4.3.143-Win32.msi
