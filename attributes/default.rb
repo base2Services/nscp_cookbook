@@ -1,5 +1,5 @@
 #upstream chocolatey package is broken
-default["nscp"]["use_chocolatey"] = false
+default["nscp"]["use_chocolatey"] = true
 
 default["nscp"]["install_path"] = "C:\\Program Files\\NSClient++"
 default["nscp"]["script_path"] = "#{node["nscp"]["install_path"]}\\scripts"
